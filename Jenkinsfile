@@ -1,75 +1,36 @@
 pipeline {
-
-  environment {
-    dockerregistry = 'https://registry.hub.docker.com'
-    dockerhuburl = 'novanovn/chitchat'
-    githuburl = 'novanovn/chitchat'
-    dockerhubcrd = '94992ee7-67a1-4a48-8086-d9a1d2d1ddb3'
-    dockerImage = ''
-  }
-
-  agent any
-
-  tools {nodejs "nodejs1017"}
-
-  stages {
-
-    stage('Clone git repo') {
-      steps {
-         git 'https://github.com/' + githuburl
-      }
+    environment {
+        // This registry is important for removing the image after the tests
+        registry = "novanovn/chitchatinside"
     }
+    agent any
+    stages {
+        stage("Test") {
+            steps {
+                script {
+                    // Building the Docker image
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
 
-    stage('Install dependencies') {
-      steps {
-        sh 'npm install'
-      }
-    }     
-    stage('Test') {
-      steps {
-         sh 'npm test'
+                    try {
+                        dockerImage.inside() {
+                            // Extracting the PROJECTDIR environment variable from inside the container
+                            def PROJECTDIR = sh(script: 'echo \$PROJECTDIR', returnStdout: true).trim()
+
+                            // Copying the project into our workspace
+                            sh "cp -r '$PROJECTDIR' '$WORKSPACE'"
+
+                            // Running the tests inside the new directory
+                            dir("$WORKSPACE$PROJECTDIR") {
+                                sh "npm test"
+                            }
+                        }
+
+                    } finally {
+                        // Removing the docker image
+                        sh "docker rmi $registry:$BUILD_NUMBER"
+                    }
+                }
+            }
         }
     }
-
-    stage('Build image') {
-      steps{
-        script {
-          dockerImage = docker.build(dockerhuburl + ":$BUILD_NUMBER")
-        }
-      }
-    }
-
-    stage('Test image') {
-      steps {
-        sh 'docker run -i ' + dockerhuburl + ':$BUILD_NUMBER npm test'
-      }
-    }
-
-    stage('Deploy image') {
-      steps{
-        script {
-          docker.withRegistry(dockerregistry, dockerhubcrd ) {
-            dockerImage.push("${env.BUILD_NUMBER}")
-            dockerImage.push("latest")
-          }
-        }
-      }
-    }
-
-    stage('Remove image') {
-      steps{
-        sh "docker rmi $dockerhuburl:$BUILD_NUMBER"
-      }
-    }
-
-    stage('Deploy k8s') {
-      steps {
-        kubernetesDeploy(
-          kubeconfigId: 'f065d458-31b9-4650-9b40-d1845fbf2c47',
-          configs: 'k8s.yaml',
-          enableConfigSubstitution: true
-        )
-      }
-    }
-  }
 }
