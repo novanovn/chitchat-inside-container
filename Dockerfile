@@ -3,7 +3,7 @@ ENV PROJECTDIR /usr/src/app
 WORKDIR $PROJECTDIR
 COPY package*.json ./
  
-RUN npm install -g mocha chai
+RUN npm install -g mocha chai chai-http
 COPY . .
  
 EXPOSE 4141
