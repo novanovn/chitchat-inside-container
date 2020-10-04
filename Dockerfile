@@ -1,9 +1,9 @@
-FROM node:10
+FROM node:latest
 ENV PROJECTDIR /usr/src/app
 WORKDIR $PROJECTDIR
 COPY package*.json ./
  
-RUN npm install -g mocha chai chai-http
+RUN npm install 
 COPY . .
  
 EXPOSE 4141
