@@ -1,5 +1,6 @@
 FROM node:10
-WORKDIR /usr/src/app
+ENV PROJECTDIR /usr/src/app
+WORKDIR $PROJECTDIR
 COPY package*.json ./
  
 RUN npm install
